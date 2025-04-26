@@ -14,7 +14,7 @@ ARDUINO_VIDS_PIDS = [
     (0x239A, 0x800B)   # Adafruit Feather M0
 ]
 
-SERIAL_PORT = None
+SERIAL_PORT = '/dev/ttyACM0'
 ports = serial.tools.list_ports.comports()
 print("Available serial ports:")
 for port, desc, hwid in sorted(ports):
@@ -84,8 +84,9 @@ HTML_TEMPLATE = """
 <head>
     <title>Arduino LED Control</title>
     <style>
-        body {{ font-family: sans-serif; text-align: center; margin-top: 50px; }}
-        .button {{
+    {% raw %}  {# <--- ADD THIS TAG #}
+        body { font-family: sans-serif; text-align: center; margin-top: 50px; }
+        .button {
             padding: 15px 30px;
             font-size: 18px;
             cursor: pointer;
@@ -93,12 +94,13 @@ HTML_TEMPLATE = """
             border: none;
             border-radius: 5px;
             color: white;
-        }}
-        .on-button {{ background-color: #4CAF50; }} /* Green */
-        .off-button {{ background-color: #f44336; }} /* Red */
-        .status {{ margin-top: 20px; font-style: italic; color: #555; }}
-        .error {{ color: red; font-weight: bold; }}
-        .message {{ color: blue; font-weight: bold; }}
+        }
+        .on-button { background-color: #4CAF50; } /* Green */
+        .off-button { background-color: #f44336; } /* Red */
+        .status { margin-top: 20px; font-style: italic; color: #555; }
+        .error { color: red; font-weight: bold; }
+        .message { color: blue; font-weight: bold; }
+    {% endraw %} {# <--- AND ADD THIS TAG #}
     </style>
 </head>
 <body>
@@ -109,7 +111,7 @@ HTML_TEMPLATE = """
       {% if messages %}
         <div>
           {% for category, message in messages %}
-            <p class="{{ category }}">{{ message }}</p>
+            <p class="{{ category }}">{{ message }}</p> {# Jinja still processes this part #}
           {% endfor %}
         </div>
       {% endif %}
@@ -120,13 +122,13 @@ HTML_TEMPLATE = """
             <button class="button on-button" type="submit" name="action" value="on">Turn LED ON (h)</button>
             <button class="button off-button" type="submit" name="action" value="off">Turn LED OFF (l)</button>
         </form>
-        <p class="status">Serial Port: {{ port }} | Status: Connected</p>
+        <p class="status">Serial Port: {{ port }} | Status: Connected</p> {# Jinja still processes this #}
     {% else %}
-        <p class="error">Error: Cannot connect to Arduino on {{ port }}.</p>
+        <p class="error">Error: Cannot connect to Arduino on {{ port }}.</p> {# Jinja still processes this #}
         <p>Please check:</p>
         <ul>
             <li>Is the Arduino plugged in?</li>
-            <li>Is the correct SERIAL_PORT ('{{ port }}') set in app.py?</li>
+            <li>Is the correct SERIAL_PORT ('{{ port }}') set in app.py?</li> {# Jinja still processes this #}
             <li>Does the user running this script have permission for the serial port? (e.g., add to 'dialout' group on Linux)</li>
             <li>Is the Arduino IDE's Serial Monitor closed?</li>
         </ul>
