@@ -102,17 +102,16 @@ def init_serial():
 # Attempt to initialize serial connection on startup
 init_serial()
 
-# Updated HTML template with buttons for each pin
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
     <title>Arduino Pin Control</title>
     <style>
-    {{ '{%' }} raw {{ '%}' }} {# <--- Jinja needs these to ignore CSS as template code #}
-        body {{ font-family: sans-serif; text-align: center; margin-top: 30px; }}
-        h1 {{ margin-bottom: 30px; }}
-        .button {{
+    {% raw %} {# <--- Use standard Jinja tag #}
+        body { font-family: sans-serif; text-align: center; margin-top: 30px; }
+        h1 { margin-bottom: 30px; }
+        .button {
             padding: 12px 25px;
             font-size: 16px;
             cursor: pointer;
@@ -121,20 +120,20 @@ HTML_TEMPLATE = """
             border-radius: 5px;
             color: white;
             min-width: 150px; /* Ensure buttons have similar width */
-        }}
-        .pin-button {{ background-color: #007bff; }} /* Blue */
-        .pin-button:hover {{ background-color: #0056b3; }}
-        .status {{ margin-top: 25px; font-style: italic; color: #555; }}
-        .error {{ color: red; font-weight: bold; background-color: #ffe0e0; padding: 10px; border-radius: 5px; display: inline-block; margin-bottom:15px; }}
-        .message {{ color: blue; font-weight: bold; background-color: #e0e0ff; padding: 10px; border-radius: 5px; display: inline-block; margin-bottom:15px; }}
-        ul {{ list-style: none; padding: 0; }}
-        li {{ margin-bottom: 5px; }}
-        .retry-button {{
+        }
+        .pin-button { background-color: #007bff; } /* Blue */
+        .pin-button:hover { background-color: #0056b3; }
+        .status { margin-top: 25px; font-style: italic; color: #555; }
+        .error { color: red; font-weight: bold; background-color: #ffe0e0; padding: 10px; border-radius: 5px; display: inline-block; margin-bottom:15px; }
+        .message { color: blue; font-weight: bold; background-color: #e0e0ff; padding: 10px; border-radius: 5px; display: inline-block; margin-bottom:15px; }
+        ul { list-style: none; padding: 0; }
+        li { margin-bottom: 5px; }
+        .retry-button {
             padding: 8px 15px; background-color: #ffc107; color: black;
             border: none; border-radius: 4px; cursor: pointer; margin-top: 10px;
-        }}
-         .retry-button:hover {{ background-color: #e0a800; }}
-    {{ '{%' }} endraw {{ '%}' }} {# <--- End of raw block #}
+        }
+         .retry-button:hover { background-color: #e0a800; }
+    {% endraw %} {# <--- Use standard Jinja tag #}
     </style>
 </head>
 <body>
@@ -142,33 +141,33 @@ HTML_TEMPLATE = """
     <p>Click a button to trigger the corresponding pin HIGH for 2 seconds.</p>
 
     <!-- Flash Messages -->
-    {{ '{%' }} with messages = get_flashed_messages(with_categories=true) {{ '%}' }}
-      {{ '{%' }} if messages {{ '%}' }}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
         <div>
-          {{ '{%' }} for category, message in messages {{ '%}' }}
-            <p class="{{ category }}">{{ message }}</p>
-          {{ '{%' }} endfor {{ '%}' }}
+          {% for category, message in messages %}
+            <p class="{{ category }}">{{ message }}</p> {# This is Jinja processed #}
+          {% endfor %}
         </div>
-      {{ '{%' }} endif {{ '%}' }}
-    {{ '{%' }} endwith {{ '%}' }}
+      {% endif %}
+    {% endwith %}
 
 
-    {{ '{%' }} if serial_status == 'connected' {{ '%}' }}
+    {% if serial_status == 'connected' %}
         <form method="POST" action="/control">
-            {{ '{%' }} for pin in pins {{ '%}' }} {# Loop through pins passed from Flask #}
+            {% for pin in pins %} {# Loop through pins passed from Flask #}
                  <button class="button pin-button" type="submit" name="pin" value="{{ pin }}">
-                     Trigger Pin {{ pin }}
+                     Trigger Pin {{ pin }} {# Jinja processed #}
                  </button>
-            {{ '{%' }} endfor {{ '%}' }}
+            {% endfor %}
         </form>
-        <p class="status">Serial Port: {{ port }} | Status: Connected</p>
+        <p class="status">Serial Port: {{ port }} | Status: Connected</p> {# Jinja processed #}
 
-    {{ '{%' }} else {{ '%}' }}
-        <p class="error">Error: Cannot connect to Arduino{{ ' on ' + port if port else '' }}.</p>
+    {% else %}
+        <p class="error">Error: Cannot connect to Arduino{{ ' on ' + port if port else '' }}.</p> {# Jinja processed #}
         <p>Please check:</p>
         <ul>
             <li>Is the Arduino plugged in and running the correct sketch?</li>
-            <li>Is the correct SERIAL_PORT ('{{ port or 'Not Set' }}') detected/set in the script?</li>
+            <li>Is the correct SERIAL_PORT ('{{ port or 'Not Set' }}') detected/set in the script?</li> {# Jinja processed #}
             <li>Does the user running this script have permission for the serial port? (e.g., add to 'dialout' group on Linux: `sudo usermod -a -G dialout $USER`)</li>
             <li>Is the Arduino IDE's Serial Monitor or another program using the port closed?</li>
         </ul>
@@ -176,7 +175,7 @@ HTML_TEMPLATE = """
              <button type="submit" class="retry-button">Retry Connection</button>
         </form>
 
-    {{ '{%' }} endif {{ '%}' }}
+    {% endif %}
 
 </body>
 </html>
