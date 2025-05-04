@@ -18,7 +18,25 @@ ARDUINO_VIDS_PIDS = [
 
 SERIAL_PORT = None # Start with None, try to find it
 BAUD_RATE = 9600
-PINS_TO_CONTROL = [6, 5, 4, 2] # Define the controllable pins here
+# This list is now less directly used for buttons, but good for reference
+CONTROLLABLE_PINS_INFO = {
+    'light_on': {'pin': 2, 'cmd': 'h2'},
+    'light_dim': {'pin': 2, 'cmd': 'h2dim'},
+    'fan_high': {'pin': 3, 'cmd': 'h3'},
+    'fan_off': {'pin': 4, 'cmd': 'h4'},
+    'fan_medium': {'pin': 5, 'cmd': 'h5'},
+    'fan_low': {'pin': 6, 'cmd': 'h6'}
+}
+
+# --- Map user-friendly actions to Arduino commands ---
+COMMAND_MAP = {
+    "light_on": "h2\n",
+    "light_dim": "h2dim\n",
+    "fan_high": "h3\n",
+    "fan_medium": "h5\n",
+    "fan_low": "h6\n",
+    "fan_off": "h4\n",
+}
 
 # --- Auto-detect Port ---
 ports = serial.tools.list_ports.comports()
@@ -80,13 +98,8 @@ def init_serial():
     try:
         print(f"Attempting to connect to {SERIAL_PORT} at {BAUD_RATE} baud...")
         ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
-        # It's crucial to wait for the Arduino to reset after opening the serial connection.
-        # The exact time can vary depending on the board and OS.
         print("Waiting for Arduino to initialize...")
         time.sleep(2.5) # Give Arduino time to reset (adjust if needed)
-        # Maybe read any startup messages from Arduino
-        # initial_lines = ser.read_until(b'\n', 5).decode(errors='ignore') # Read for up to 5s
-        # print(f"Initial Arduino Output: {initial_lines.strip()}")
         ser.reset_input_buffer() # Clear any data sent during reset
         print("Serial connection established.")
         return True
@@ -102,50 +115,72 @@ def init_serial():
 # Attempt to initialize serial connection on startup
 init_serial()
 
+# --- Updated HTML Template ---
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Arduino Pin Control</title>
+    <title>Arduino Device Control</title>
     <style>
-    {% raw %} {# <--- Use standard Jinja tag #}
-        body { font-family: sans-serif; text-align: center; margin-top: 30px; }
-        h1 { margin-bottom: 30px; }
+    {% raw %} {# Standard Jinja tag for raw block #}
+        body { font-family: sans-serif; text-align: center; margin-top: 30px; background-color: #f4f4f4; }
+        h1 { margin-bottom: 20px; color: #333; }
+        p { color: #555; }
+        .control-section {
+            background-color: #fff;
+            padding: 20px;
+            margin: 20px auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            max-width: 500px;
+        }
+        .control-section h2 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #444;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
         .button {
-            padding: 12px 25px;
+            padding: 10px 20px;
             font-size: 16px;
             cursor: pointer;
-            margin: 8px;
+            margin: 5px;
             border: none;
             border-radius: 5px;
             color: white;
-            min-width: 150px; /* Ensure buttons have similar width */
+            min-width: 120px; /* Uniform button width */
+            transition: background-color 0.2s ease;
         }
-        .pin-button { background-color: #007bff; } /* Blue */
-        .pin-button:hover { background-color: #0056b3; }
-        .status { margin-top: 25px; font-style: italic; color: #555; }
+        .light-button { background-color: #ffc107; color: #333; } /* Yellow for light */
+        .light-button:hover { background-color: #e0a800; }
+        .fan-button { background-color: #17a2b8; } /* Cyan for fan */
+        .fan-button:hover { background-color: #138496; }
+        .off-button { background-color: #dc3545; } /* Red for off */
+        .off-button:hover { background-color: #c82333; }
+
+        .status { margin-top: 25px; font-style: italic; color: #666; }
         .error { color: red; font-weight: bold; background-color: #ffe0e0; padding: 10px; border-radius: 5px; display: inline-block; margin-bottom:15px; }
         .message { color: blue; font-weight: bold; background-color: #e0e0ff; padding: 10px; border-radius: 5px; display: inline-block; margin-bottom:15px; }
         ul { list-style: none; padding: 0; }
-        li { margin-bottom: 5px; }
+        li { margin-bottom: 5px; text-align: left; margin-left: 30px;}
         .retry-button {
-            padding: 8px 15px; background-color: #ffc107; color: black;
+            padding: 8px 15px; background-color: #28a745; color: white; /* Green for retry */
             border: none; border-radius: 4px; cursor: pointer; margin-top: 10px;
         }
-         .retry-button:hover { background-color: #e0a800; }
-    {% endraw %} {# <--- Use standard Jinja tag #}
+         .retry-button:hover { background-color: #218838; }
+    {% endraw %} {# End raw block #}
     </style>
 </head>
 <body>
-    <h1>Arduino Pin Control</h1>
-    <p>Click a button to trigger the corresponding pin HIGH for 2 seconds.</p>
+    <h1>Arduino Device Control</h1>
 
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
-        <div>
+        <div style="margin-bottom: 20px;">
           {% for category, message in messages %}
-            <p class="{{ category }}">{{ message }}</p> {# This is Jinja processed #}
+            <p class="{{ category }}">{{ message }}</p> {# Jinja processed #}
           {% endfor %}
         </div>
       {% endif %}
@@ -154,26 +189,48 @@ HTML_TEMPLATE = """
 
     {% if serial_status == 'connected' %}
         <form method="POST" action="/control">
-            {% for pin in pins %} {# Loop through pins passed from Flask #}
-                 <button class="button pin-button" type="submit" name="pin" value="{{ pin }}">
-                     Trigger Pin {{ pin }} {# Jinja processed #}
-                 </button>
-            {% endfor %}
+            <div class="control-section">
+                <h2>Light Control</h2>
+                <button class="button light-button" type="submit" name="action" value="light_on">
+                    Light ON
+                </button>
+                <button class="button light-button" type="submit" name="action" value="light_dim">
+                    Light DIM
+                </button>
+            </div>
+
+            <div class="control-section">
+                <h2>Fan Control</h2>
+                <button class="button fan-button" type="submit" name="action" value="fan_high">
+                    Fan HIGH
+                </button>
+                 <button class="button fan-button" type="submit" name="action" value="fan_medium">
+                    Fan MEDIUM
+                </button>
+                 <button class="button fan-button" type="submit" name="action" value="fan_low">
+                    Fan LOW
+                </button>
+                <button class="button off-button" type="submit" name="action" value="fan_off">
+                    Fan OFF
+                </button>
+            </div>
         </form>
         <p class="status">Serial Port: {{ port }} | Status: Connected</p> {# Jinja processed #}
 
     {% else %}
-        <p class="error">Error: Cannot connect to Arduino{{ ' on ' + port if port else '' }}.</p> {# Jinja processed #}
-        <p>Please check:</p>
-        <ul>
-            <li>Is the Arduino plugged in and running the correct sketch?</li>
-            <li>Is the correct SERIAL_PORT ('{{ port or 'Not Set' }}') detected/set in the script?</li> {# Jinja processed #}
-            <li>Does the user running this script have permission for the serial port? (e.g., add to 'dialout' group on Linux: `sudo usermod -a -G dialout $USER`)</li>
-            <li>Is the Arduino IDE's Serial Monitor or another program using the port closed?</li>
-        </ul>
-        <form method="POST" action="/retry_serial">
-             <button type="submit" class="retry-button">Retry Connection</button>
-        </form>
+         <div class="control-section">
+             <p class="error">Error: Cannot connect to Arduino{{ ' on ' + port if port else '' }}.</p> {# Jinja processed #}
+             <p>Please check:</p>
+             <ul>
+                 <li>Is the Arduino plugged in and running the correct sketch?</li>
+                 <li>Is the correct SERIAL_PORT ('{{ port or 'Not Set' }}') detected/set in the script?</li> {# Jinja processed #}
+                 <li>Does the user running this script have permission for the serial port? (e.g., `sudo usermod -a -G dialout $USER` on Linux)</li>
+                 <li>Is the Arduino IDE's Serial Monitor or another program using the port closed?</li>
+             </ul>
+             <form method="POST" action="/retry_serial">
+                  <button type="submit" class="retry-button">Retry Connection</button>
+             </form>
+         </div>
 
     {% endif %}
 
@@ -185,15 +242,14 @@ HTML_TEMPLATE = """
 def index():
     """Renders the main control page."""
     status = 'connected' if ser and ser.is_open else 'disconnected'
-    # Pass the list of pins to the template
+    # No longer need to pass pins list for button generation
     return render_template_string(HTML_TEMPLATE,
                                   serial_status=status,
-                                  port=SERIAL_PORT,
-                                  pins=PINS_TO_CONTROL)
+                                  port=SERIAL_PORT)
 
 @app.route('/control', methods=['POST'])
-def control_pin():
-    """Handles the button clicks to send pin-specific commands."""
+def control_device(): # Renamed function for clarity
+    """Handles the button clicks to send device-specific commands."""
     global ser
     if not ser or not ser.is_open:
         if not init_serial(): # Try to reconnect if disconnected
@@ -203,32 +259,29 @@ def control_pin():
              flash("Reconnected to serial port.", "message")
 
 
-    # Get the pin number from the button that was clicked
-    pin_str = request.form.get('pin')
+    # Get the action identifier from the button that was clicked
+    action_id = request.form.get('action')
 
-    # Validate the input
-    try:
-        pin_num = int(pin_str)
-        if pin_num not in PINS_TO_CONTROL:
-            raise ValueError("Invalid pin number")
-    except (TypeError, ValueError):
-         flash(f"Invalid pin value received: {pin_str}", "error")
+    # Validate the action and get the corresponding command string
+    if action_id in COMMAND_MAP:
+        command_str_with_newline = COMMAND_MAP[action_id]
+        command_str_no_newline = command_str_with_newline.strip() # For display/logging
+        # Encode the command to bytes for sending over serial
+        command_bytes = command_str_with_newline.encode('ascii') # Use 'ascii' or 'utf-8'
+    else:
+         flash(f"Invalid action received: {action_id}", "error")
+         print(f"Error: Invalid action ID received from form: {action_id}")
          return redirect(url_for('index'))
 
-    # Construct the command string (e.g., "h6") and add newline for Arduino's serialEvent
-    command_str = f"h{pin_num}\n"
-    # Encode the command to bytes for sending over serial
-    command_bytes = command_str.encode('ascii') # Use 'ascii' or 'utf-8'
-
+    # --- Send the command ---
     try:
         ser.write(command_bytes)
-        # Optional: Short delay might sometimes help if commands are sent too rapidly,
-        # but usually the Arduino side handles it.
+        # Optional: Short delay might sometimes help
         # time.sleep(0.05)
 
-        # Optional: Read response from Arduino if you implemented one
+        # Optional: Read response from Arduino if implemented
         # try:
-        #     response = ser.readline().decode('ascii').strip()
+        #     response = ser.readline().decode('ascii').strip() # Adjust timeout/decode as needed
         #     print(f"Arduino response: {response}")
         #     if response:
         #          flash(f"Arduino: {response}", "message")
@@ -237,7 +290,9 @@ def control_pin():
         # except Exception as read_e:
         #      print(f"Error reading Arduino response: {read_e}")
 
-        message = f"Sent command '{command_str.strip()}' to trigger Pin {pin_num}"
+        # Generate user-friendly action description
+        action_desc = action_id.replace('_', ' ').title()
+        message = f"Sent command '{command_str_no_newline}' to perform action: {action_desc}"
         flash(message, "message")
         print(message)
 
@@ -250,8 +305,7 @@ def control_pin():
         except:
             pass
         ser = None # Mark as disconnected
-        # Redirect back to index, which will show the disconnected state
-        return redirect(url_for('index'))
+        return redirect(url_for('index')) # Redirect to index to show disconnected state
     except Exception as e:
         flash(f"An unexpected error occurred sending command: {e}", "error")
         print(f"An unexpected error occurred sending command: {e}")
@@ -274,9 +328,13 @@ def close_serial_on_exit():
     if ser and ser.is_open:
         try:
             print("Closing serial port...")
-            # Maybe send a command to ensure all pins are off? Depends on Arduino code.
-            # Example: ser.write(b'off_all\n')
-            # time.sleep(0.1)
+            # Optional: Send a command to turn everything off on exit?
+            # if "fan_off" in COMMAND_MAP:
+            #     try:
+            #         ser.write(COMMAND_MAP["fan_off"].encode('ascii'))
+            #         time.sleep(0.1) # Give it a moment
+            #     except Exception as send_e:
+            #         print(f"Could not send final off command: {send_e}")
             ser.close()
             print("Serial port closed.")
         except Exception as e:
@@ -290,10 +348,10 @@ if __name__ == '__main__':
     if SERIAL_PORT:
         print(f"Target Serial Port: {SERIAL_PORT}")
     else:
-         print("Warning: SERIAL_PORT not set. Connection attempts will fail until set or detected.")
-    print(f"Controllable Pins: {PINS_TO_CONTROL}")
+         print("Warning: SERIAL_PORT not set. Connection attempts may fail.")
+    print(f"Action to Command Mapping: {COMMAND_MAP}")
     print(f"Flask server running on http://0.0.0.0:5000")
     print("Access the control page in your browser.")
     # Make accessible on your local network, use 127.0.0.1 for local only
-    # debug=True is helpful for development, but turn off for production
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # debug=True is helpful for development (auto-reloads), but turn off for production
+    app.run(host='0.0.0.0', port=5000, debug=False)
