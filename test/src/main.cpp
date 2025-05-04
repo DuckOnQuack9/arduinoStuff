@@ -6,7 +6,7 @@ const int outputPins[] = {6, 5, 4, 3, 2}; // Added pin 3
 const int numPins = sizeof(outputPins) / sizeof(outputPins[0]);
 
 // Define the *default* duration the pins should stay HIGH (in milliseconds)
-const unsigned long defaultHighDuration = 1700;
+const unsigned long defaultHighDuration = 250;
 // Define the special duration for the 'h2dim' command (in milliseconds)
 const unsigned long dimHighDuration = 4000; // 3000 ms = 3 seconds
 
